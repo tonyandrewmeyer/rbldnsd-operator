@@ -1,0 +1,127 @@
+name: rbldnsd
+summary: rbldnsd DNS blacklist server
+title: rbldnsd DNS Blacklist Server
+description: |
+  This charm deploys and manages the rbldnsd DNS blacklist server on Ubuntu 24.04 machines.
+  It handles installation, service management, and provides a foundation for further configuration.
+
+type: "charm"
+base: ubuntu@24.04
+platforms:
+  amd64:
+  arm64:
+parts:
+  charm:
+    plugin: uv
+    source: .
+    build-snaps:
+      - astral-uv
+
+config:
+  options:
+    hostname:
+      description: Base hostname for the rbldnsd service.
+      type: string
+      default: "example.com"
+    bind-addresses:
+      description: |
+        JSON list of addresses to bind rbldnsd to. If empty, defaults to ["0.0.0.0"].
+      type: string
+      default: "[\"0.0.0.0\"]"
+    port:
+      description: Port to bind rbldnsd to.
+      default: 53
+      type: int
+    ipv4-only:
+      description: Only listen on IPv4.
+      default: false
+      type: boolean
+    ipv6-only:
+      description: Only listen on IPv6.
+      default: false
+      type: boolean
+    check-interval:
+      description: Interval between checking for zone file changes.
+      default: "1m"
+      type: string
+
+actions:
+  reload:
+    description: Reload rbldnsd zones
+    additionalProperties: false
+  add-static-list:
+    description: Add a static list to rbldnsd
+    params:
+      subdomain:
+        type: string
+        description: Subdomain for the static list
+      type:
+        type: string
+        description: Type of the static list (ip4set or dnset)
+        enum:
+          - ip4set
+          - dnset
+      filename:
+        type: string
+        description: Path to the file containing the static list entries
+    required:
+      - subdomain
+      - type
+      - filename
+    additionalProperties: false
+  remove-static-list:
+    description: Remove a static list from rbldnsd
+    params:
+      subdomain:
+        type: string
+  add-entry:
+    description: Add an entry to the dynamic DNSBL list
+    params:
+      type:
+        type: string
+        description: Entry type (ip4set or dnset)
+        enum:
+          - ip4set
+          - dnset
+      value:
+        type: string
+        description: IP address (for ip4set) or domain (for dnset)
+      a_record:
+        type: string
+        description: A record to return (optional)
+      txt_record:
+        type: string
+        description: TXT record to return (optional)
+    required:
+      - type
+      - value
+    additionalProperties: false
+  remove-entry:
+    description: Remove an entry from the dynamic DNSBL list
+    params:
+      type:
+        type: string
+        description: Entry type (ip4set or dnset)
+        enum:
+          - ip4set
+          - dnset
+      value:
+        type: string
+        description: IP address (for ip4set) or domain (for dnset)
+    required:
+      - type
+      - value
+    additionalProperties: false
+  list-entries:
+    description: List all dynamic DNSBL entries
+    params:
+      type:
+        type: string
+        description: Entry type to list (ip4set, dnset, or omit for all)
+    additionalProperties: false
+
+charm-libs:
+  - lib: operator_libs_linux.apt
+    version: "0"
+  - lib: operator_libs_linux.systemd
+    version: "1"
