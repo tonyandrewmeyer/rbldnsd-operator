@@ -12,6 +12,7 @@ import pathlib
 import sqlite3
 
 import ops
+
 import rbldnsd
 
 logger = logging.getLogger(__name__)

@@ -6,8 +6,9 @@
 import sqlite3
 
 import pytest
-from charm import DB_PATH, RbldnsdCharm
 from ops import testing
+
+from charm import DB_PATH, RbldnsdCharm
 
 
 def mock_get_version():
@@ -293,6 +294,7 @@ class TestActionHandling:
                 testing.State(),
             )
 
+        assert isinstance(exc_info.value, testing.ActionFailed)
         assert exc_info.value.message == "IP already exists"
 
     def test_remove_entry_action(self, monkeypatch, tmp_path):
@@ -455,6 +457,7 @@ class TestErrorHandling:
                 ),
                 testing.State(),
             )
+        assert isinstance(exc_info.value, testing.ActionFailed)
         assert "Invalid type" in exc_info.value.message
 
     def test_database_operations_with_missing_file(self, monkeypatch):
