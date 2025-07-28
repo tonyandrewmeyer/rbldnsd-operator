@@ -38,13 +38,13 @@ def dns_lookup(
         cmd.append(f"{reversed_ip}.{domain}")
     else:
         cmd.append(f"{value}.{domain}")
-    dig = subprocess.run(cmd, collect_output=True, check=True)
+    dig = subprocess.run(cmd, capture_output=True, check=True)
     assert dig.returncode == 0
     assert dig.stdout.strip() == str(a_record)
     if not txt_record:
         return
     cmd.append("TXT")
-    dig = subprocess.run(cmd, collect_output=True, check=True)
+    dig = subprocess.run(cmd, capture_output=True, check=True)
     assert dig.returncode == 0
     assert dig.stdout.strip() == f'"{txt_record}"'
 
@@ -78,7 +78,7 @@ def test_add_list_remove_ip4set_entry(juju: jubilant.Juju, type: str, value: str
     result = juju.run("rbldnsd/0", "remove-entry", params={"type": type, "value": value})
     result.raise_on_failure()
     # List again to confirm removal.
-    result = juju.run("rbldnsd/0", "list-entries", type=type)
+    result = juju.run("rbldnsd/0", "list-entries", params={"type": type})
     result.raise_on_failure()
     assert not result.results[type]
 

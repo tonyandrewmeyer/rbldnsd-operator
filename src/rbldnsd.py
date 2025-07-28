@@ -13,8 +13,8 @@ import signal
 import sqlite3
 import subprocess
 
-from charms.operator_libs_linux.v0 import apt
-from charms.operator_libs_linux.v1 import systemd
+from charms.operator_libs_linux.v0 import apt  # ty: ignore[unresolved-import]
+from charms.operator_libs_linux.v1 import systemd  # ty: ignore[unresolved-import]
 
 logger = logging.getLogger(__name__)
 
