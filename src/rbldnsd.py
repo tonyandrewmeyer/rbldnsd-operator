@@ -6,6 +6,7 @@
 The intention is that this module could be used outside the context of a charm.
 """
 
+import ipaddress
 import logging
 import os
 import pathlib
@@ -91,11 +92,11 @@ def get_version() -> str | None:
 
 
 def write_rbldnsd_config(
-    bind_addresses,
-    port,
-    ipv4_only,
-    ipv6_only,
-    check_interval,
+    bind_addresses: list[ipaddress.IPv4Address | ipaddress.IPv6Address],
+    port: int,
+    ipv4_only: bool,
+    ipv6_only: bool,
+    check_interval: str,
     hostname: str,
     db_path: pathlib.Path | None = None,
 ):
@@ -147,6 +148,7 @@ def write_dynamic_entries_db(db_path: pathlib.Path):
         with open("/var/lib/rbldns/dynamic-ip4set", "w") as f:
             for ip, a_record, txt_record in cursor.fetchall():
                 f.write(f"{ip} :{a_record}{':' if txt_record else ''}{txt_record}\n")
+        cursor.execute("SELECT domain, a_record, txt_record FROM dnset")
         with open("/var/lib/rbldns/dynamic-dnset", "w") as f:
             for domain, a_record, txt_record in cursor.fetchall():
                 f.write(f"{domain} :{a_record}{':' if txt_record else ''}{txt_record}\n")
