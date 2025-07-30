@@ -1,4 +1,4 @@
-name: rbldnsd
+name: rbldnsd-test
 summary: rbldnsd DNS blacklist server
 title: rbldnsd DNS Blacklist Server
 description: |
@@ -74,6 +74,16 @@ actions:
     params:
       subdomain:
         type: string
+      type:
+        type: string
+        description: Entry type (ip4set or dnset)
+        enum:
+          - ip4set
+          - dnset
+    required:
+      - subdomain
+      - type
+    additionalProperties: false
   add-entry:
     description: Add an entry to the dynamic DNSBL list
     params:

@@ -3,6 +3,8 @@
 #
 # To learn more about testing, see https://ops.readthedocs.io/en/latest/explanation/testing.html
 
+import ipaddress
+import json
 import sqlite3
 
 import pytest
@@ -103,6 +105,11 @@ class TestCharmInitialisation:
 class TestConfigurationChanges:
     """Test configuration change handling."""
 
+    @pytest.fixture(autouse=True)
+    def setup_monkeypatch(self, monkeypatch):
+        """Set up monkeypatching for all tests in this class."""
+        mock_rbldnsd_functions(monkeypatch)
+
     def test_config_changed_success(self, monkeypatch):
         write_config_called = []
 
@@ -110,14 +117,13 @@ class TestConfigurationChanges:
             write_config_called.append((args, kwargs))
 
         monkeypatch.setattr("charm.rbldnsd.write_rbldnsd_config", mock_write_config)
-        monkeypatch.setattr("charm.rbldnsd.restart", lambda: True)
 
         ctx = testing.Context(RbldnsdCharm)
 
         config = {
             "hostname": "test.example.com",
             "port": 5353,
-            "bind-addresses": "['127.0.0.1']",
+            "bind-addresses": json.dumps(["0.0.0.0"]),
             "ipv4-only": False,
             "ipv6-only": False,
             "check-interval": "2m",
@@ -128,7 +134,7 @@ class TestConfigurationChanges:
         assert state_out.unit_status == testing.ActiveStatus()
         assert len(write_config_called) == 1
         assert write_config_called[0][0] == (
-            '"[0.0.0.0]"',
+            [ipaddress.ip_address("0.0.0.0")],
             5353,
             False,
             False,
@@ -178,7 +184,7 @@ class TestConfigurationChanges:
         config = {
             "hostname": "test.example.com",
             "port": 5353,
-            "bind-addresses": "['127.0.0.1']",
+            "bind-addresses": json.dumps(["127.0.0.1"]),
             "ipv4-only": False,
             "ipv6-only": False,
             "check-interval": "2m",
@@ -458,11 +464,9 @@ class TestErrorHandling:
                 testing.State(),
             )
         assert isinstance(exc_info.value, testing.ActionFailed)
-        assert "Invalid type" in exc_info.value.message
+        assert "invalid type" in exc_info.value.message
 
     def test_database_operations_with_missing_file(self, monkeypatch):
-        mock_rbldnsd_functions(monkeypatch)
-
         ctx = testing.Context(RbldnsdCharm)
 
         ctx.run(
@@ -474,5 +478,6 @@ class TestErrorHandling:
         )
 
         assert ctx.action_logs == [
-            "Please copy the list into the unit. `juju scp /local/path unit/0:/var/lib/rbldns/`"
+            "Please copy the list into the unit. "
+            "`juju scp /local/path rbldnsd-test/0:/var/lib/rbldns/`"
         ]

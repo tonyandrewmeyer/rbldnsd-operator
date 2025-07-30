@@ -290,9 +290,10 @@ class RbldnsdCharm(ops.CharmBase):
         params = event.load_params(AddStaticListAction, errors="fail")
         if not pathlib.Path(params.filename).exists():
             event.log(
-                "Please copy the list into the unit. "
-                "`juju scp /local/path {self.unit}:/var/lib/rbldns/`"
+                f"Please copy the list into the unit. "
+                f"`juju scp /local/path {self.unit.name}:/var/lib/rbldns/`"
             )
+            return
         self._init_db()
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
@@ -301,7 +302,9 @@ class RbldnsdCharm(ops.CharmBase):
                 (params.subdomain, params.type, params.filename),
             )
             conn.commit()
-        self._write_config()
+        if not self._write_config():
+            event.fail("Failed to write rbldnsd config")
+            return
         rbldnsd.restart()
         event.set_results({"result": f"Static list added: {params.subdomain} ({params.type})"})
 
@@ -318,7 +321,9 @@ class RbldnsdCharm(ops.CharmBase):
                 event.fail(f"Static list not found: {params.subdomain} ({params.type})")
                 return
             conn.commit()
-        self._write_config()
+        if not self._write_config():
+            event.fail("Failed to write rbldnsd config")
+            return
         rbldnsd.restart()
         event.set_results({"result": f"Static list removed: {params.subdomain} ({params.type})"})
 
@@ -378,7 +383,8 @@ class RbldnsdCharm(ops.CharmBase):
 
     def _on_config_changed(self, _: ops.ConfigChangedEvent):
         """Handle config changed event."""
-        self._write_config()
+        if not self._write_config():
+            return
         if not rbldnsd.restart():
             self.unit.status = ops.BlockedStatus("Failed to restart rbldnsd")
             return
@@ -390,7 +396,7 @@ class RbldnsdCharm(ops.CharmBase):
         except ValueError as e:
             logger.error("Failed to load config: %s", e)
             self.unit.status = ops.BlockedStatus(f"Invalid config: {e}")
-            return
+            return False
         rbldnsd.write_rbldnsd_config(
             config.bind_addresses,
             config.port,
@@ -398,8 +404,9 @@ class RbldnsdCharm(ops.CharmBase):
             config.ipv6_only,
             config.check_interval,
             config.hostname,
-            db_path=DB_PATH,
+            DB_PATH,
         )
+        return True
 
 
 if __name__ == "__main__":  # pragma: nocover
