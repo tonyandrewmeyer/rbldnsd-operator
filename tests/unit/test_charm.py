@@ -55,8 +55,7 @@ class TestCharmInitialisation:
 
         state_out = ctx.run(ctx.on.install(), testing.State())
 
-        assert isinstance(state_out.unit_status, testing.BlockedStatus)
-        assert "Failed to install rbldnsd" in state_out.unit_status.message
+        assert state_out.unit_status == testing.BlockedStatus("Failed to install rbldnsd.")
 
     def test_start_success(self, monkeypatch):
         monkeypatch.setattr("charm.rbldnsd.get_version", mock_get_version)
@@ -82,8 +81,7 @@ class TestCharmInitialisation:
 
         state_out = ctx.run(ctx.on.start(), testing.State())
 
-        assert isinstance(state_out.unit_status, testing.BlockedStatus)
-        assert "Failed to start rbldnsd" in state_out.unit_status.message
+        assert state_out.unit_status == testing.BlockedStatus("Failed to start rbldnsd")
 
     def test_remove(self, monkeypatch):
         remove_called = []
@@ -97,8 +95,7 @@ class TestCharmInitialisation:
 
         state_out = ctx.run(ctx.on.remove(), testing.State())
 
-        assert isinstance(state_out.unit_status, testing.BlockedStatus)
-        assert "rbldnsd removed" in state_out.unit_status.message
+        assert state_out.unit_status == testing.BlockedStatus("rbldnsd removed.")
         assert remove_called, "rbldnsd.remove should have been called"
 
 
@@ -120,7 +117,7 @@ class TestConfigurationChanges:
 
         ctx = testing.Context(RbldnsdCharm)
 
-        config = {
+        config: dict[str, str | int | float] = {
             "hostname": "test.example.com",
             "port": 5353,
             "bind-addresses": json.dumps(["0.0.0.0"]),
@@ -146,10 +143,10 @@ class TestConfigurationChanges:
     def test_config_changed_invalid_port(self, monkeypatch):
         ctx = testing.Context(RbldnsdCharm)
 
-        config = {
+        config: dict[str, str | int | float] = {
             "hostname": "test.example.com",
             "port": 70000,  # Invalid port
-            "bind-addresses": "['127.0.0.1']",
+            "bind-addresses": json.dumps(["127.0.0.1"]),
             "ipv4-only": False,
             "ipv6-only": False,
             "check-interval": "2m",
@@ -159,14 +156,15 @@ class TestConfigurationChanges:
 
         assert isinstance(state_out.unit_status, testing.BlockedStatus)
         assert "Invalid config" in state_out.unit_status.message
+        assert "Port must be between 1 and 65535" in state_out.unit_status.message
 
     def test_config_changed_conflicting_ip_versions(self, monkeypatch):
         ctx = testing.Context(RbldnsdCharm)
 
-        config = {
+        config: dict[str, str | int | float] = {
             "hostname": "test.example.com",
             "port": 53,
-            "bind-addresses": "['127.0.0.1']",
+            "bind-addresses": json.dumps(["127.0.0.1"]),
             "ipv4-only": True,
             "ipv6-only": True,  # Conflict with ipv4-only
             "check-interval": "2m",
@@ -181,7 +179,7 @@ class TestConfigurationChanges:
         monkeypatch.setattr("charm.rbldnsd.restart", lambda: False)
         ctx = testing.Context(RbldnsdCharm)
 
-        config = {
+        config: dict[str, str | int | float] = {
             "hostname": "test.example.com",
             "port": 5353,
             "bind-addresses": json.dumps(["127.0.0.1"]),
@@ -478,6 +476,5 @@ class TestErrorHandling:
         )
 
         assert ctx.action_logs == [
-            "Please copy the list into the unit. "
-            "`juju scp /local/path rbldnsd-test/0:/var/lib/rbldns/`"
+            "Please copy the list into the unit. `juju scp /local/path rbldnsd/0:/var/lib/rbldns/`"
         ]

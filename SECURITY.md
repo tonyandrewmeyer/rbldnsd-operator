@@ -16,10 +16,9 @@ The easiest way to report a security issue is through
 vulnerability](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing/privately-reporting-a-security-vulnerability)
 for instructions on reporting using GitHub's security advisory feature.
 
-The shimmer GitHub admins will be notified of the issue and will work with you
-to determine whether the issue qualifies as a security issue and, if so, in
-which component. We will then figure out a fix, get a CVE
-assigned, and coordinate the release of the fix.
+The repository admins will be notified of the issue and will work with you
+to determine whether the issue qualifies as a security issue. We will then
+figure out a fix, get a CVE assigned, and coordinate the release of the fix.
 
 If you have a deadline for public disclosure, please let us know.
 Our vulnerability management team intends to respond within 3 working
