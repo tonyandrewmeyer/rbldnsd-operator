@@ -14,10 +14,15 @@ import signal
 import sqlite3
 import subprocess
 
-from charms.operator_libs_linux.v0 import apt  # ty: ignore[unresolved-import]
-from charms.operator_libs_linux.v1 import systemd  # ty: ignore[unresolved-import]
+from charmlibs import apt, systemd
 
 logger = logging.getLogger(__name__)
+
+
+RBLDNSD_BIN = "/usr/sbin/rbldnsd"
+PID_FILE = pathlib.Path("/var/run/rbldnsd.pid")
+DEFAULTS_FILE = pathlib.Path("/etc/default/rbldnsd")
+WORKLOAD_DATA_DIR = pathlib.Path("/var/lib/rbldns")
 
 
 # Functions for managing the workload process on the local machine:
@@ -43,11 +48,11 @@ def start() -> bool:
         systemd.service_start("rbldnsd")
         return True
     except systemd.SystemdError as e:
-        logger.error(f"Failed to start rbldnsd service: {e}")
+        logger.error("Failed to start rbldnsd service: %s", e)
     return False
 
 
-def remove():
+def remove() -> None:
     """Remove the rbldnsd package using apt."""
     apt.remove_package("rbldnsd")
 
@@ -62,10 +67,9 @@ def restart() -> bool:
     return False
 
 
-def reload_zones():
+def reload_zones() -> None:
     """Send SIGHUP to rbldnsd to reload zones."""
-    with open("/var/run/rbldnsd.pid", "r") as f:
-        pid = int(f.read())
+    pid = int(PID_FILE.read_text())
     os.kill(pid, signal.SIGHUP)
 
 
@@ -75,18 +79,15 @@ def reload_zones():
 def get_version() -> str | None:
     """Get the running version of the workload."""
     try:
-        result = subprocess.run(
-            ["/usr/sbin/rbldnsd", "-h"], capture_output=True, text=True, check=True
-        )
+        result = subprocess.run([RBLDNSD_BIN, "-h"], capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to get rbldnsd version: {e}")
+        logger.error("Failed to get rbldnsd version: %s", e)
         return None
     # Help output starts with something like:
     # "rbldnsd: rbl dns daemon version 1.0pre (snapshot 20210120)"
     first_line = result.stdout.splitlines()[0]
     if "version" in first_line:
-        version = first_line.split("version", 1)[1].strip()
-        return version
+        return first_line.split("version", 1)[1].strip()
     logger.error("Unexpected output format from rbldnsd -h: %s", first_line)
     return None
 
@@ -99,9 +100,9 @@ def write_rbldnsd_config(
     check_interval: str,
     hostname: str,
     db_path: pathlib.Path | None = None,
-):
+) -> None:
     """Write the /etc/default/rbldnsd file."""
-    cmd = []
+    cmd: list[str] = []
     for addr in bind_addresses:
         cmd.extend(["-b", f"{addr}/{port}"])
     if ipv4_only:
@@ -121,13 +122,12 @@ def write_rbldnsd_config(
         "#",
         '# RBLDNSD="dsbl -r/var/lib/rbldns/dsbl -b127.2 list.dsbl.org:ip4set:list"',
         "",
-        f'RBLDNSD="- -f -r/var/lib/rbldns/ -p /var/run/rbldnsd.pid {cmd_str} '
+        f'RBLDNSD="- -f -r{WORKLOAD_DATA_DIR}/ -p {PID_FILE} {cmd_str} '
         f"ip.{hostname}:ip4set:dynamic-ip4set "
         f"domain.{hostname}:dnset:dynamic-dnset"
         f' {" ".join(f"{s}.{hostname}:{t}:{f}" for s, t, f in static_lists)}"',
     ]
-    with open("/etc/default/rbldnsd", "w") as f:
-        f.write("\n".join(lines))
+    DEFAULTS_FILE.write_text("\n".join(lines))
 
 
 def _get_static_lists(db_path: pathlib.Path) -> list[tuple[str, str, str]]:
@@ -140,15 +140,19 @@ def _get_static_lists(db_path: pathlib.Path) -> list[tuple[str, str, str]]:
         return list(cursor.fetchall())
 
 
-def write_dynamic_entries_db(db_path: pathlib.Path):
+def write_dynamic_entries_db(db_path: pathlib.Path) -> None:
     """Write the dynamic entries to the database."""
     with sqlite3.connect(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT ip, a_record, txt_record FROM ip4set")
-        with open("/var/lib/rbldns/dynamic-ip4set", "w") as f:
-            for ip, a_record, txt_record in cursor.fetchall():
-                f.write(f"{ip} :{a_record}{':' if txt_record else ''}{txt_record}\n")
+        ip_lines = [
+            f"{ip} :{a_record}{':' if txt_record else ''}{txt_record}"
+            for ip, a_record, txt_record in cursor.fetchall()
+        ]
+        (WORKLOAD_DATA_DIR / "dynamic-ip4set").write_text("\n".join(ip_lines) + "\n")
         cursor.execute("SELECT domain, a_record, txt_record FROM dnset")
-        with open("/var/lib/rbldns/dynamic-dnset", "w") as f:
-            for domain, a_record, txt_record in cursor.fetchall():
-                f.write(f"{domain} :{a_record}{':' if txt_record else ''}{txt_record}\n")
+        domain_lines = [
+            f"{domain} :{a_record}{':' if txt_record else ''}{txt_record}"
+            for domain, a_record, txt_record in cursor.fetchall()
+        ]
+        (WORKLOAD_DATA_DIR / "dynamic-dnset").write_text("\n".join(domain_lines) + "\n")

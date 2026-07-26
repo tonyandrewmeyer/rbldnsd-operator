@@ -48,7 +48,7 @@ class RbldnsdConfig:
                 try:
                     addresses.append(ipaddress.ip_address(addr))
                 except ValueError:
-                    raise ValueError(f"Invalid bind address: {addr}")
+                    raise ValueError(f"Invalid bind address: {addr}") from None
             object.__setattr__(self, "bind_addresses", addresses)
         if self.port and not 1 <= self.port <= 65535:
             raise ValueError(f"Port must be between 1 and 65535, got {self.port}")
@@ -87,7 +87,7 @@ class AddEntryAction:
         if self.type == "ip4set":
             if isinstance(self.value, str):
                 # rbldnsd allows partial addresses, like "127.0" to mean anything that starts
-                # with "127.0" However, we do not want to expose that, as it's too easy to
+                # with "127.0". However, we do not want to expose that, as it's too easy to
                 # widely block. So we only allow full addresses.
                 object.__setattr__(self, "value", ipaddress.ip_address(self.value))
             if isinstance(self.value, ipaddress.IPv6Address):
@@ -188,7 +188,7 @@ class RbldnsdCharm(ops.CharmBase):
         # bout total bytes written to network
         # *: total values for all zones
 
-    def _init_db(self):
+    def _init_db(self) -> None:
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
@@ -225,7 +225,9 @@ class RbldnsdCharm(ops.CharmBase):
             )
             conn.commit()
 
-    def _add_entry_db(self, entry_type: str, value: str, a_record: str, txt_record: str):
+    def _add_entry_db(
+        self, entry_type: str, value: str, a_record: str, txt_record: str
+    ) -> tuple[bool, str | None]:
         self._init_db()
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
@@ -250,7 +252,7 @@ class RbldnsdCharm(ops.CharmBase):
             conn.commit()
         return True, None
 
-    def _remove_entry_db(self, entry_type: str, value: str):
+    def _remove_entry_db(self, entry_type: str, value: str) -> tuple[bool, str | None]:
         self._init_db()
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
@@ -267,11 +269,11 @@ class RbldnsdCharm(ops.CharmBase):
             conn.commit()
         return True, None
 
-    def _list_entries_db(self, entry_type: str | None = None):
+    def _list_entries_db(self, entry_type: str | None = None) -> dict[str, list[dict[str, str]]]:
         self._init_db()
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
-            result = {}
+            result: dict[str, list[dict[str, str]]] = {}
             if entry_type in (None, "ip4set"):
                 c.execute("SELECT ip, a_record, txt_record FROM ip4set")
                 result["ip4set"] = [
@@ -286,7 +288,7 @@ class RbldnsdCharm(ops.CharmBase):
                 ]
             return result
 
-    def _on_add_static_list_action(self, event: ops.ActionEvent):
+    def _on_add_static_list_action(self, event: ops.ActionEvent) -> None:
         params = event.load_params(AddStaticListAction, errors="fail")
         if not pathlib.Path(params.filename).exists():
             event.log(
@@ -308,7 +310,7 @@ class RbldnsdCharm(ops.CharmBase):
         rbldnsd.restart()
         event.set_results({"result": f"Static list added: {params.subdomain} ({params.type})"})
 
-    def _on_remove_static_list_action(self, event: ops.ActionEvent):
+    def _on_remove_static_list_action(self, event: ops.ActionEvent) -> None:
         params = event.load_params(RemoveStaticListAction, errors="fail")
         self._init_db()
         with sqlite3.connect(DB_PATH) as conn:
@@ -327,36 +329,36 @@ class RbldnsdCharm(ops.CharmBase):
         rbldnsd.restart()
         event.set_results({"result": f"Static list removed: {params.subdomain} ({params.type})"})
 
-    def _on_add_entry_action(self, event: ops.ActionEvent):
+    def _on_add_entry_action(self, event: ops.ActionEvent) -> None:
         params = event.load_params(AddEntryAction, errors="fail")
         ok, msg = self._add_entry_db(
             params.type, str(params.value), str(params.a_record), params.txt_record
         )
         if not ok:
-            event.fail(msg)
+            event.fail(msg or "Failed to add entry")
             return
         event.set_results({"result": f"Entry added: {params.type} {params.value}"})
         rbldnsd.write_dynamic_entries_db(DB_PATH)
 
-    def _on_remove_entry_action(self, event: ops.ActionEvent):
+    def _on_remove_entry_action(self, event: ops.ActionEvent) -> None:
         params = event.load_params(RemoveEntryAction, errors="fail")
         ok, msg = self._remove_entry_db(params.type, str(params.value))
         if not ok:
-            event.fail(msg)
+            event.fail(msg or "Failed to remove entry")
             return
         event.set_results({"result": f"Entry removed: {params.type} {params.value}"})
         rbldnsd.write_dynamic_entries_db(DB_PATH)
 
-    def _on_list_entries_action(self, event: ops.ActionEvent):
+    def _on_list_entries_action(self, event: ops.ActionEvent) -> None:
         params = event.load_params(ListEntriesAction, errors="fail")
         entries = self._list_entries_db(params.type)
         event.set_results(entries)
 
-    def _on_reload_action(self, event: ops.ActionEvent):
+    def _on_reload_action(self, event: ops.ActionEvent) -> None:
         rbldnsd.reload_zones()
         event.set_results({"result": "rbldnsd zones reloaded"})
 
-    def _on_install(self, _: ops.InstallEvent):
+    def _on_install(self, _: ops.InstallEvent) -> None:
         """Install the workload on the machine."""
         self.unit.status = ops.MaintenanceStatus("Installing rbldnsd.")
         if not rbldnsd.install():
@@ -364,7 +366,7 @@ class RbldnsdCharm(ops.CharmBase):
             return
         self.unit.status = ops.ActiveStatus()
 
-    def _on_start(self, _: ops.StartEvent):
+    def _on_start(self, _: ops.StartEvent) -> None:
         """Handle start event."""
         self.unit.status = ops.MaintenanceStatus("Starting rbldnsd")
         if not rbldnsd.start():
@@ -375,13 +377,13 @@ class RbldnsdCharm(ops.CharmBase):
             self.unit.set_workload_version(version)
         self.unit.status = ops.ActiveStatus()
 
-    def _on_remove(self, _: ops.RemoveEvent):
+    def _on_remove(self, _: ops.RemoveEvent) -> None:
         """Handle remove event by removing the workload."""
         self.unit.status = ops.MaintenanceStatus("Removing rbldnsd")
         rbldnsd.remove()
         self.unit.status = ops.BlockedStatus("rbldnsd removed.")
 
-    def _on_config_changed(self, _: ops.ConfigChangedEvent):
+    def _on_config_changed(self, _: ops.ConfigChangedEvent) -> None:
         """Handle config changed event."""
         if not self._write_config():
             return
@@ -390,7 +392,7 @@ class RbldnsdCharm(ops.CharmBase):
             return
         self.unit.status = ops.ActiveStatus()
 
-    def _write_config(self):
+    def _write_config(self) -> bool:
         try:
             config = self.load_config(RbldnsdConfig)
         except ValueError as e:
