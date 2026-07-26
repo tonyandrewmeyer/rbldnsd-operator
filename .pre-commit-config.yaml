@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v5.0.0
     hooks:
       - id: trailing-whitespace
         exclude: ^tests/fixtures/
@@ -16,27 +16,47 @@ repos:
       - id: check-docstring-first
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.9
+    # Keep in sync with the ruff version resolved in uv.lock, so that pre-commit
+    # and the tox/CI lint env agree on formatting and lint results.
+    rev: v0.15.15
     hooks:
-      - id: ruff
+      - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
 
+  # These run via `uv run --frozen` so they use the versions pinned in uv.lock,
+  # rather than whatever happens to be on PATH.
   - repo: local
     hooks:
       - id: ty
         name: ty check
-        entry: ty
-        args: [check]
+        entry: uv
+        args:
+          - run
+          - --frozen
+          - --no-default-groups
+          - --group=lint
+          - --group=unit
+          - --group=integration
+          - ty
+          - check
         language: system
         types: [python]
         pass_filenames: false
 
       - id: pytest-unit
         name: pytest unit tests
-        entry: pytest
+        entry: uv
+        args:
+          - run
+          - --frozen
+          - --no-default-groups
+          - --group=unit
+          - pytest
+          - tests/unit
+          - -q
+          - --maxfail=1
         language: system
-        args: [tests/, --maxfail=1, -x, -q]
         types: [python]
         pass_filenames: false
         stages: [pre-push]

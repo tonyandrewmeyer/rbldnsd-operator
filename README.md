@@ -57,12 +57,12 @@ juju run rbldnsd/0 add-static-list subdomain=mybl type=ip4set filename=mybl.zone
 Parameters:
 - `subdomain`: The subdomain for this list (for example, "mybl" creates mybl.example.com)
 - `type`: Either "ip4set" for IP addresses or "dnset" for domains
-- `filename`: Path to the file containing the list entries (in the `/var/lib/rbldnds` folder)
+- `filename`: Path to the file containing the list entries (in the `/var/lib/rbldns/` folder)
 
 You also need to copy the list to the unit:
 
 ```bash
-juju scp mybl.zone rbldnsd/0:/var/lib/rbldnsd/
+juju scp mybl.zone rbldnsd/0:/var/lib/rbldns/
 ```
 
 ### Removing a static list

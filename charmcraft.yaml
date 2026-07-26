@@ -1,15 +1,21 @@
-name: rbldnsd-test
-summary: rbldnsd DNS blacklist server
+# This file configures Charmcraft.
+# See https://documentation.ubuntu.com/charmcraft/stable/reference/files/charmcraft-yaml-file/
+type: charm
+name: rbldnsd
 title: rbldnsd DNS Blacklist Server
+summary: rbldnsd DNS blacklist server
 description: |
   This charm deploys and manages the rbldnsd DNS blacklist server on Ubuntu 24.04 machines.
   It handles installation, service management, and provides a foundation for further configuration.
 
-type: "charm"
 base: ubuntu@24.04
 platforms:
   amd64:
   arm64:
+
+assumes:
+  - juju >= 3.6
+
 parts:
   charm:
     plugin: uv
@@ -129,9 +135,3 @@ actions:
         type: string
         description: Entry type to list (ip4set, dnset, or omit for all)
     additionalProperties: false
-
-charm-libs:
-  - lib: operator_libs_linux.apt
-    version: "0"
-  - lib: operator_libs_linux.systemd
-    version: "1"
