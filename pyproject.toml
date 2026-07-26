@@ -66,6 +66,11 @@ max-complexity = 10
 [tool.codespell]
 skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.coverage"
 
+[dependency-groups]
+dev = [
+    "zizmor>=1.28.0",
+]
+
 [tool.ty.src]
 include = ["src", "tests"]
 
