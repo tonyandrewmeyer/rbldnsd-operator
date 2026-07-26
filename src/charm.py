@@ -73,7 +73,9 @@ class AddEntryAction:
     """Type of entry to add."""
     value: ipaddress.IPv4Address | str
     """Value of entry to add."""
-    a_record: ipaddress.IPv4Address | ipaddress.IPv6Address = ipaddress.ip_address("127.0.0.2")
+    a_record: ipaddress.IPv4Address | ipaddress.IPv6Address = dataclasses.field(
+        default_factory=lambda: ipaddress.ip_address("127.0.0.2")
+    )
     """A record to add."""
     txt_record: str = ""
     """TXT record to add."""
